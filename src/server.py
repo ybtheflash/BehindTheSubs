@@ -292,7 +292,7 @@ def get_pipeline_status(task_id: str):
 @app.get("/api/results")
 def get_results():
     if LATEST_RESULT is None:
-        raise HTTPException(status_code=404, detail="No pipeline result available yet.")
+        return {"result": None, "cues": []}
     return LATEST_RESULT
 
 @app.post("/api/cue/update")

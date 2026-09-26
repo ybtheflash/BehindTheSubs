@@ -42,7 +42,7 @@ export const App: React.FC = () => {
     fetch('/api/results')
       .then(res => res.json())
       .then(data => {
-        if (data && data.cues) {
+        if (data && Array.isArray(data.cues) && data.cues.length > 0) {
           setResult(data);
         }
       })
