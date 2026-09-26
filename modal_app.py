@@ -20,11 +20,12 @@ image = (
         "numpy>=1.26.0",
         "scipy>=1.14.0",
         "gradio-client>=2.7.0",
+        "faster-whisper>=1.0.0",
         "webvtt-py>=0.4.6",
         "srt>=3.5.3"
     )
-    .add_local_dir("src", remote_path="/root/src")
-    .add_local_dir("frontend/dist", remote_path="/root/frontend/dist")
+    .add_local_dir("src", remote_path="/root/src", copy=True)
+    .add_local_dir("frontend/dist", remote_path="/root/frontend/dist", copy=True)
     .add_local_file(".env", remote_path="/root/.env", copy=True)
 )
 
