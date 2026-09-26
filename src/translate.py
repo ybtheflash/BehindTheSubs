@@ -93,15 +93,17 @@ BENGALI_FALLBACK_DICT = {
 class SubtitleTranslator:
     def __init__(
         self,
-        mimo_key: Optional[str] = default_config.mimo_api_key,
-        gemini_key: Optional[str] = default_config.gemini_api_key,
-        anthropic_key: Optional[str] = default_config.anthropic_api_key,
-        openai_key: Optional[str] = default_config.openai_api_key
+        deepseek_key: Optional[str] = None,
+        mimo_key: Optional[str] = None,
+        gemini_key: Optional[str] = None,
+        anthropic_key: Optional[str] = None,
+        openai_key: Optional[str] = None
     ):
-        self.mimo_key = mimo_key or os.getenv("MIMO_API_KEY")
-        self.gemini_key = gemini_key or os.getenv("GEMINI_API_KEY")
-        self.anthropic_key = anthropic_key or os.getenv("ANTHROPIC_API_KEY")
-        self.openai_key = openai_key or os.getenv("OPENAI_API_KEY")
+        self.deepseek_key = deepseek_key if deepseek_key is not None else (os.getenv("DEEPSEEK_API_KEY") or getattr(default_config, "deepseek_api_key", ""))
+        self.mimo_key = mimo_key if mimo_key is not None else (os.getenv("MIMO_API_KEY") or getattr(default_config, "mimo_api_key", ""))
+        self.gemini_key = gemini_key if gemini_key is not None else (os.getenv("GEMINI_API_KEY") or getattr(default_config, "gemini_api_key", ""))
+        self.anthropic_key = anthropic_key if anthropic_key is not None else (os.getenv("ANTHROPIC_API_KEY") or getattr(default_config, "anthropic_api_key", ""))
+        self.openai_key = openai_key if openai_key is not None else (os.getenv("OPENAI_API_KEY") or getattr(default_config, "openai_api_key", ""))
 
     def translate_cues(
         self,
@@ -115,7 +117,7 @@ class SubtitleTranslator:
         - 'bn_rom': Romanized Bengali (Banglish in Latin script)
         - 'hi_rom': Romanized Hindi (Hinglish in Latin script)
 
-        Uses Xiaomi MiMo LLM / Google Gemini Flash / Claude / OpenAI if keys are configured,
+        Uses DeepSeek Flash / Xiaomi MiMo LLM / Google Gemini Flash if keys are configured,
         with seamless local context-aware transliteration & dictionary fallback.
         """
         if not cues:
@@ -125,15 +127,23 @@ class SubtitleTranslator:
 
         translated_via_api = False
 
-        # 1. Try Xiaomi MiMo LLM first (preferred for Bengali translation & romanization)
-        if self.mimo_key:
+        # 1. Try DeepSeek API first (primary high-speed Bengali/Hindi/Romanized translator)
+        if self.deepseek_key:
+            try:
+                self._translate_with_deepseek(cues, target_languages)
+                translated_via_api = True
+            except Exception as e:
+                logger.warning(f"DeepSeek translation failed: {e}. Trying Xiaomi MiMo...")
+
+        # 2. Try Xiaomi MiMo LLM if DeepSeek failed or not configured
+        if not translated_via_api and self.mimo_key:
             try:
                 self._translate_with_mimo(cues, target_languages)
                 translated_via_api = True
             except Exception as e:
                 logger.warning(f"Xiaomi MiMo translation failed: {e}. Trying Google Gemini...")
 
-        # 2. Try Google Gemini Flash if MiMo failed or not configured
+        # 3. Try Google Gemini Flash if MiMo failed or not configured
         if not translated_via_api and self.gemini_key:
             try:
                 self._translate_with_gemini(cues, target_languages)
@@ -201,6 +211,82 @@ class SubtitleTranslator:
             f'{{"results": [{{"id": 1, "en": "English", "hi": "हिन्दी", "bn_rom": "Banglish", "hi_rom": "Hinglish"}}]}}\n\n'
             f"Bengali Cues to Localise:\n{json.dumps(cues_data, ensure_ascii=False, indent=2)}"
         )
+
+    def _translate_with_deepseek(self, cues: List[SubtitleCue], target_languages: List[str]) -> List[SubtitleCue]:
+        import httpx
+        primary_model = os.getenv("DEEPSEEK_MODEL", getattr(default_config, "deepseek_model", "deepseek-flash"))
+        candidate_models = [primary_model, "deepseek-flash", "deepseek-chat"]
+        seen = set()
+        models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
+        batch_size = 25
+        key = self.deepseek_key
+        base_url = getattr(default_config, "deepseek_base_url", "https://api.deepseek.com").rstrip("/")
+        url = f"{base_url}/chat/completions"
+
+        for i in range(0, len(cues), batch_size):
+            batch = cues[i:i + batch_size]
+            prompt = self._build_batch_prompt(batch, target_languages)
+
+            headers = {
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json"
+            }
+
+            translated = False
+            for model in models_to_try:
+                payload = {
+                    "model": model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a professional Bengali media localisation and subtitling expert. "
+                                "Translate Bengali dialogue accurately into the requested tracks. "
+                                "Preserve code-switched English words and conversational tone. "
+                                "Output strictly valid JSON matching the requested schema."
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    "temperature": 0.1
+                }
+                try:
+                    with httpx.Client(timeout=45.0) as client:
+                        res = client.post(url, json=payload, headers=headers)
+                    if res.status_code == 200:
+                        data = res.json()
+                        choices = data.get("choices", [])
+                        if choices:
+                            raw_content = choices[0].get("message", {}).get("content", "").strip()
+                            clean_json = raw_content
+                            if "```json" in clean_json:
+                                clean_json = clean_json.split("```json")[1].split("```")[0].strip()
+                            elif "```" in clean_json:
+                                clean_json = clean_json.split("```")[1].split("```")[0].strip()
+
+                            parsed = json.loads(clean_json)
+                            results = {item["id"]: item for item in parsed.get("results", [])}
+                            for cue in batch:
+                                if cue.index in results:
+                                    res_item = results[cue.index]
+                                    for lang in target_languages:
+                                        if lang in res_item:
+                                            cue.translations[lang] = str(res_item[lang]).strip()
+                            translated = True
+                            logger.info(f"DeepSeek ({model}) successfully translated batch of {len(batch)} cues.")
+                            break
+                    else:
+                        logger.warning(f"DeepSeek translation API ({model}) returned HTTP {res.status_code}: {res.text[:150]}")
+                except Exception as e:
+                    logger.warning(f"DeepSeek translation attempt ({model}) error: {e}")
+
+            if not translated:
+                raise RuntimeError(f"All DeepSeek chat models failed to translate batch {i}-{i+batch_size}.")
+
+        return cues
 
     def _translate_with_mimo(self, cues: List[SubtitleCue], target_languages: List[str]) -> List[SubtitleCue]:
         import httpx

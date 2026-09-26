@@ -26,6 +26,11 @@ class PipelineConfig:
     # ASR Provider: 'bengali_ai' (bengaliAI Regional Whisper Medium), 'gemini' (gemini-flash-latest), or 'whisper.cpp' (whisper.cpp-1.9.4 C++ AVX2)
     asr_provider: str = os.getenv("ASR_PROVIDER", "bengali_ai")
 
+    # DeepSeek API Settings (Primary LLM Translator for Bengali, Hindi, Romanized)
+    deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY", "")
+    deepseek_base_url: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+    deepseek_model: str = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
+
     # Xiaomi MiMo ASR Settings
     mimo_api_key: str = os.getenv("MIMO_API_KEY", "")
     mimo_api_keys_raw: str = os.getenv("MIMO_API_KEYS", "")

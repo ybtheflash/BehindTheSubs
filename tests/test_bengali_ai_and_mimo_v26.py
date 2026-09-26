@@ -71,8 +71,8 @@ def test_unified_asr_uses_bengali_ai_by_default(tmp_path):
         assert used in ("bengali_whisper", "bengali_ai")
         assert len(words) == 1
 
-def test_mimo_v26_flash_translation_structure():
-    translator = SubtitleTranslator(mimo_key="test_key")
+def test_deepseek_flash_translation_structure():
+    translator = SubtitleTranslator(deepseek_key="sk-test-deepseek")
     cues = [
         SubtitleCue(index=1, start=0.0, end=2.0, text="আমি কাল অফিসে আসব।", speaker="SPEAKER_00")
     ]
@@ -92,7 +92,34 @@ def test_mimo_v26_flash_translation_structure():
     with patch("httpx.Client.post", return_value=mock_response) as mock_post:
         res = translator.translate_cues(cues, ["hi", "bn_rom", "hi_rom", "en"])
         call_json = mock_post.call_args[1]["json"]
-        # Verify primary model is mimo-v2.6-flash
+        assert call_json["model"] == "deepseek-flash"
+        assert res[0].translations["bn_rom"] == "Ami kal office-e ashbo."
+        assert res[0].translations["hi"] == "मैं कल ऑफिस आऊंगा।"
+        assert res[0].translations["hi_rom"] == "Main kal office aunga."
+        assert res[0].translations["en"] == "I will come to the office tomorrow."
+
+def test_mimo_v26_flash_translation_structure():
+    translator = SubtitleTranslator(deepseek_key="", mimo_key="test_key")
+    cues = [
+        SubtitleCue(index=1, start=0.0, end=2.0, text="আমি কাল অফিসে আসব।", speaker="SPEAKER_00")
+    ]
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": '{"results": [{"id": 1, "hi": "मैं कल ऑफिस आऊंगा।", "bn_rom": "Ami kal office-e ashbo.", "hi_rom": "Main kal office aunga.", "en": "I will come to the office tomorrow."}]}'
+                }
+            }
+        ]
+    }
+
+    with patch("httpx.Client.post", return_value=mock_response) as mock_post:
+        res = translator.translate_cues(cues, ["hi", "bn_rom", "hi_rom", "en"])
+        call_json = mock_post.call_args[1]["json"]
+        # Verify model is mimo-v2.6-flash when falling back to MiMo
         assert call_json["model"] == "mimo-v2.6-flash"
         assert res[0].translations["bn_rom"] == "Ami kal office-e ashbo."
         assert res[0].translations["hi"] == "मैं कल ऑफिस आऊंगा।"

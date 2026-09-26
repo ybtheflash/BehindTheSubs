@@ -65,6 +65,8 @@ class Bong2SubsPipeline:
             max_cue_duration=self.config.max_cue_duration
         )
         self.translator = SubtitleTranslator(
+            deepseek_key=self.config.deepseek_api_key,
+            mimo_key=self.config.mimo_api_key,
             anthropic_key=self.config.anthropic_api_key,
             openai_key=self.config.openai_api_key,
             gemini_key=self.config.gemini_api_key
