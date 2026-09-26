@@ -1,0 +1,26 @@
+name: Keep Modal AI Endpoints Awake
+
+on:
+  schedule:
+    # Runs every 25 minutes to keep Modal GPU containers warm without exhausting quotas
+    - cron: '*/25 * * * *'
+  workflow_dispatch:
+    # Allows manual trigger anytime from GitHub Actions tab
+
+jobs:
+  ping_endpoints:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Modal Bengali ASR (XLS-R) Health
+        run: |
+          echo "Pinging Modal Bengali XLS-R health endpoint..."
+          curl -s -f --max-time 20 "https://ybtheflash--bengali-asr-asr-web.modal.run/health" || echo "Modal XLS-R warming up..."
+
+      - name: Ping Modal Regional Bengali Whisper Health
+        run: |
+          echo "Pinging Modal Regional Whisper health endpoint..."
+          curl -s -f --max-time 20 "https://ybtheflash--whisper-bengali-whisperasr-web.modal.run/health" || echo "Modal Whisper warming up..."
+
+      - name: Summary
+        run: |
+          echo "Keep-alive ping completed. Light GET /health keeps instances ready without consuming GPU transcription quota."

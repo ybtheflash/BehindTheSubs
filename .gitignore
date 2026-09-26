@@ -1,0 +1,39 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Environment and secrets
+.env
+.env.local
+*.pem
+*.key
+
+# Application data & outputs
+outputs/
+artifacts/
+temp/
+uploads/
+cache/
+whisper.cpp-1.9.4/
+*.bin
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+web/node_modules/
+.pnpm-store/
+frontend/dist/
+web/dist/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

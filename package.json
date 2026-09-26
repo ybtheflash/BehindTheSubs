@@ -1,0 +1,23 @@
+{
+  "name": "bong2subs",
+  "version": "1.0.0",
+  "description": "Bong2Subs — Bengali Subtitle & Closed-Caption Pipeline with Speaker Diarization and AI QC Engine",
+  "scripts": {
+    "dev": "pnpm --dir frontend dev",
+    "build": "pnpm --dir frontend build",
+    "preview": "pnpm --dir frontend preview",
+    "server": "python -m uvicorn src.server:app --host 127.0.0.1 --port 8000 --reload",
+    "pipeline": "python src/pipeline.py",
+    "test": "pytest tests/"
+  },
+  "keywords": [
+    "bengali",
+    "subtitles",
+    "speech-recognition",
+    "diarization",
+    "qc",
+    "hoichoi"
+  ],
+  "author": "Bong2Subs Team",
+  "license": "MIT"
+}
